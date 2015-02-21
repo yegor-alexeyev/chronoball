@@ -139,19 +139,23 @@ if (window['DeviceOrientationEvent']) {
   console.log("DeviceOrientation is not");
 }
 
+var peerHandlers = {};
+peerHandlers['Animation'] = function (obj) {
+    other.stop();
+    if (typeof (obj.cx) != "undefined") {
+      other.animate({cx: obj.cx}, 10000);
+    }
+}
+
 function onChannelMessage(event) {
         var obj = JSON.parse(event.data);
-      switch (obj.variant) {
-        case "Animation":
-          other.stop();
-          if (typeof (obj.cx) != "undefined") {
-            other.animate({cx: obj.cx}, 10000);
-          }
-          break;
-      }
-      //    alert(event.data);
-          //var data = JSON.parse(event.data);
-          //console.log(data);
+    console.debug('Peer message received: ' + event.data);
+    if (obj.variant in peerHandlers) {
+        peerHandlers[obj.variant](obj);
+    }
+    else {
+        console.warn('Unrecognized peer message: ' + obj.variant);
+    }
 }
 
     offerer.ondatachannel = function (event) {
@@ -214,55 +218,60 @@ function onChannelMessage(event) {
   window.addEventListener("touchend", function(event: any) { event.preventDefault(); if (event.touches[0].clientX < 300) { OnKeyUp(74); } else {OnKeyUp(75); } } , false);
     window.onkeydown = function(event) {OnKeyDown(event.keyCode);};
     window.onkeyup = function(event) { OnKeyUp(event.keyCode);};
+var wsHandlers = {};
+
+wsHandlers['RequestOfOffer'] = function(data) {
+    controllable = blueCircle;
+    other = redCircle;
+    CreateOffer();
+}
+
+wsHandlers['FirstSessionDescription'] = function(data) {
+    var desc = new RTCSessionDescription(data);
+    offerer.setRemoteDescription(desc, function() {
+      for (var index = 0; index < ice.length; index++) {
+        offerer.addIceCandidate(new RTCIceCandidate(ice[index]));
+        //console.log(ice[index]);
+      }
+      ice = [];
+      offerer.createAnswer(function (answer) {
+          offerer.setLocalDescription(answer);
+          var obj:any = new Object();
+          obj.variant = "SecondSessionDescription";
+          obj.fields = answer;
+          ws.send(JSON.stringify(obj)); },
+      function(error) {alert(error)}, mediaConstraints);
+    });
+}
+
+wsHandlers['SecondSessionDescription'] = function(data) {
+    //var desc = new RTCSessionDescription({sdp: obj.fields, type:"answer"});
+    var desc = new RTCSessionDescription(data);
+    offerer.setRemoteDescription(desc);
+    //console.log("answerer: " + obj.fields.sdp);
+      for (var index = 0; index < ice.length; index++) {
+        offerer.addIceCandidate(new RTCIceCandidate(ice[index]));
+        //console.log(ice[index]);
+      }
+      ice = [];
+}
+
+wsHandlers['IceCandidate'] = function(data) {
+          //console.log(obj.fields);
+          if (offerer.remoteDescription != null) {
+              offerer.addIceCandidate(new RTCIceCandidate(data));
+          } else {
+            ice[ice.length] = data;
+          }
+}
 
   function OnWebSocketMessage(evt) {
     var obj = JSON.parse(evt.data);
-    console.log(obj);
-    switch (obj.variant) {
-      case "RequestOfOffer":
-        controllable = blueCircle;
-        other = redCircle;
-        CreateOffer();
-        break;
-
-      case "FirstSessionDescription":
-    //alert(obj.variant);
-
-          var desc = new RTCSessionDescription(obj.fields);
-          offerer.setRemoteDescription(desc, function() {
-            for (var index = 0; index < ice.length; index++) {
-              offerer.addIceCandidate(new RTCIceCandidate(ice[index]));
-              //console.log(ice[index]);
-            }
-            ice = [];
-            offerer.createAnswer(function (answer) {
-                offerer.setLocalDescription(answer);
-                var obj:any = new Object();
-                obj.variant = "SecondSessionDescription";
-                obj.fields = answer;
-                ws.send(JSON.stringify(obj)); },
-            function(error) {alert(error)}, mediaConstraints);
-          });
-        break;
-      case "SecondSessionDescription":
-          //var desc = new RTCSessionDescription({sdp: obj.fields, type:"answer"});
-          var desc = new RTCSessionDescription(obj.fields);
-          offerer.setRemoteDescription(desc);
-          //console.log("answerer: " + obj.fields.sdp);
-            for (var index = 0; index < ice.length; index++) {
-              offerer.addIceCandidate(new RTCIceCandidate(ice[index]));
-              //console.log(ice[index]);
-            }
-            ice = [];
-          break;
-      case "IceCandidate":
-          //console.log(obj.fields);
-          if (offerer.remoteDescription != null) {
-              offerer.addIceCandidate(new RTCIceCandidate(obj.fields));
-          } else {
-            ice[ice.length] = obj.fields;
-          }
-          break;
+    console.debug('Peer message received: ' + evt.data);
+    if (obj.variant in wsHandlers) {
+        wsHandlers[obj.variant](obj.fields);
     }
-    //alert("Message is received..." + evt.data);
+    else {
+        console.warn('Unrecognized web socket message: ' + obj.variant);
+    }
   }
