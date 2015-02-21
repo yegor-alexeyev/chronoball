@@ -2,15 +2,23 @@
 /// <reference path="lib/DefinitelyTyped/raphael/raphael.d.ts" />
 /// <reference path="lib/DefinitelyTyped/webrtc/RTCPeerConnection.d.ts" />
 
-var paper = Raphael(10, 50, 320, 200);
+var paper = Raphael(0,0,1000,1000);
+//var paper = Raphael([0,0,'100%','100%']);
 
 // Creates circle at x = 50, y = 40, with radius 10
-var circle = paper.circle(50, 40, 10);
+var blueCircle = paper.circle(100, 40, 10);
+var redCircle = paper.circle(150, 40, 10);
 // Sets the fill attribute of the circle to red (#f00)
-circle.attr("fill", "#f00");
+blueCircle.attr("fill", "#00f");
+blueCircle.attr("stroke", "#fff");
 
 // Sets the stroke attribute of the circle to white
-circle.attr("stroke", "#fff");
+redCircle.attr("fill", "#f00");
+redCircle.attr("stroke", "#fff");
+
+var controllable = redCircle;
+var other = blueCircle;
+
 
 var p = [];
 var v = [];
@@ -65,13 +73,13 @@ v[75] = 1;
       console.log('confused on key down');
     }
     p[keyCode] = true;
-    circle.stop();
+    controllable.stop();
         var obj: any = new Object();
         obj.variant = "Animation";
     if (!p[74] || !p[75]) {
-        var newCx = circle.attr('cx') + v[keyCode]*1000;
+        var newCx = controllable.attr('cx') + v[keyCode]*1000;
         obj.cx = newCx;
-        circle.animate({cx:newCx}, 10000);
+        controllable.animate({cx:newCx}, 10000);
     }
     if (channel.readyState == 'open') {
       channel.send(JSON.stringify(obj));
@@ -89,12 +97,12 @@ v[75] = 1;
       console.log('confused on key up');
     }
     p[keyCode] = false;
-    circle.stop();
+    controllable.stop();
         var obj: any = new Object();
         obj.variant = "Animation";
     if (p[74] || p[75]) {
-        var newCx = circle.attr('cx') - v[keyCode]*1000;
-        circle.animate({cx:newCx}, 10000);
+        var newCx = controllable.attr('cx') - v[keyCode]*1000;
+        controllable.animate({cx:newCx}, 10000);
         obj.cx = newCx;
     }
     if (channel.readyState == 'open') {
@@ -119,8 +127,8 @@ if (window['DeviceOrientationEvent']) {
     if (event.gamma > 0 && !p[75]) {
       OnKeyUp(74);
       OnKeyDown(75);
-      
-    } 
+
+    }
     if (event.gamma < 0 && !p[74]) {
       OnKeyUp(75);
       OnKeyDown(74);
@@ -131,14 +139,38 @@ if (window['DeviceOrientationEvent']) {
   console.log("DeviceOrientation is not");
 }
 
+function onChannelMessage(event) {
+        var obj = JSON.parse(event.data);
+      switch (obj.variant) {
+        case "Animation":
+          other.stop();
+          if (typeof (obj.cx) != "undefined") {
+            other.animate({cx: obj.cx}, 10000);
+          }
+          break;
+      }
+      //    alert(event.data);
+          //var data = JSON.parse(event.data);
+          //console.log(data);
+}
+
+    offerer.ondatachannel = function (event) {
+        channel = event.channel;
+
+      event.channel.onopen = function () {
+          console.log("channel onopen");
+          //event.channel.send("Hello Client!");
+      };
+
+      event.channel.onmessage = onChannelMessage;
+      console.log(event);
+    };
+
 
   function CreateOffer() {
     channel = offerer.createDataChannel('channel', {});
-    channel.onmessage = function (event) {
-        //var data = JSON.parse(event.data);
-        //alert(event.data);
-    };
-    channel.onopen = function () {
+      channel.onmessage = onChannelMessage;
+      channel.onopen = function () {
         console.log("channel.open");
     };
 
@@ -163,30 +195,6 @@ if (window['DeviceOrientationEvent']) {
 
   }
 
-    offerer.ondatachannel = function (event) {
-
-      event.channel.onopen = function () {
-          console.log("channel onopen");
-          //event.channel.send("Hello Client!");
-      };
-
-      event.channel.onmessage = function (event) {
-        var obj = JSON.parse(event.data);
-      switch (obj.variant) {
-        case "Animation":
-          circle.stop();
-          if (typeof (obj.cx) != "undefined") {
-            circle.animate({cx: obj.cx}, 10000);
-          }
-          break;
-      }
-      //    alert(event.data);
-          //var data = JSON.parse(event.data);
-          console.log("ondatachannel");
-          //console.log(data);
-      };
-      console.log(event);
-    };
 
   offerer.onsignalingstatechange = function (event) {
     console.log(offerer.signalingState);
@@ -204,17 +212,19 @@ if (window['DeviceOrientationEvent']) {
 
   window.addEventListener("touchstart", function(event: any) { event.preventDefault(); if (event.touches[0].clientX < 300) { OnKeyDown(74); } else {OnKeyDown(75); } }, false);
   window.addEventListener("touchend", function(event: any) { event.preventDefault(); if (event.touches[0].clientX < 300) { OnKeyUp(74); } else {OnKeyUp(75); } } , false);
+    window.onkeydown = function(event) {OnKeyDown(event.keyCode);};
+    window.onkeyup = function(event) { OnKeyUp(event.keyCode);};
 
   function OnWebSocketMessage(evt) {
     var obj = JSON.parse(evt.data);
     console.log(obj);
     switch (obj.variant) {
       case "RequestOfOffer":
+        controllable = blueCircle;
+        other = redCircle;
         CreateOffer();
-    window.onkeydown = function(event) {OnKeyDown(event.keyCode);};
-    window.onkeyup = function(event) { OnKeyUp(event.keyCode);};
         break;
-        
+
       case "FirstSessionDescription":
     //alert(obj.variant);
 
@@ -256,6 +266,3 @@ if (window['DeviceOrientationEvent']) {
     }
     //alert("Message is received..." + evt.data);
   }
-
-
-
