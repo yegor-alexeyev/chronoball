@@ -6,11 +6,14 @@ var paper = Raphael(0,0,1000,1000);
 //var paper = Raphael([0,0,'100%','100%']);
 
 // Creates circle at x = 50, y = 40, with radius 10
-var blueCircle = paper.circle(100, 40, 10);
-var redCircle = paper.circle(150, 40, 10);
+var blueCircle = paper.rect(100, 40, 50,20,5);
+var redCircle = paper.rect(150, 240, 50, 20, 5);
 // Sets the fill attribute of the circle to red (#f00)
 blueCircle.attr("fill", "#00f");
 blueCircle.attr("stroke", "#fff");
+
+var ball = paper.circle(120, 100, 6);
+ball.attr("fill", "#0f0");
 
 // Sets the stroke attribute of the circle to white
 redCircle.attr("fill", "#f00");
@@ -32,15 +35,27 @@ v[75] = 1;
 var peerHandlers = {};
 peerHandlers['Animation'] = function (obj) {
     other.stop();
-    if (typeof (obj.cx) != "undefined") {
-        other.animate({cx: obj.cx}, 10000);
+    if (typeof (obj.x) != "undefined") {
+        other.animate({x: obj.x}, 10000);
     }
 }
 
+var x = {};
+x[1] = other
+x[-1] = controllable;
+var current = -1;
 
 
 var chan: RtcChannel;
 var channelIsOpened = false;
+
+    function callback() {
+        if (ball.getBBox().x >= redCircle.getBBox().x && ball.getBBox().x2 <= redCircle.getBBox().x2)
+        {
+            current = -current;
+            ball.animate({cy: x[current].getBBox().y2 -ball.attr('r')}, 2600, 'linear', callback);
+        }
+    }
 
 class Main implements RtcChannelHandler {
     constructor() {
@@ -48,8 +63,10 @@ class Main implements RtcChannelHandler {
         chan = new RtcChannel(this);
     }
 
+
     opened() {
         channelIsOpened = true;
+        ball.animate({cy: redCircle.getBBox().y - ball.attr('r')}, 3000, 'linear',  callback);
     }
 
     received(data) {
@@ -96,9 +113,9 @@ function OnKeyDown(keyCode) {
     var obj: any = new Object();
     obj.variant = "Animation";
     if (!p[74] || !p[75]) {
-        var newCx = controllable.attr('cx') + v[keyCode]*1000;
-        obj.cx = newCx;
-        controllable.animate({cx:newCx}, 10000);
+        var newCx = controllable.attr('x') + v[keyCode]*1000;
+        obj.x = newCx;
+        controllable.animate({x:newCx}, 10000);
     }
     if (channelIsOpened ) {
         chan.send(JSON.stringify(obj));
@@ -120,9 +137,9 @@ function OnKeyUp(keyCode) {
     var obj: any = new Object();
     obj.variant = "Animation";
     if (p[74] || p[75]) {
-        var newCx = controllable.attr('cx') - v[keyCode]*1000;
-        controllable.animate({cx:newCx}, 10000);
-        obj.cx = newCx;
+        var newx = controllable.attr('x') - v[keyCode]*1000;
+        controllable.animate({x:newx}, 10000);
+        obj.x = newx;
     }
     if (channelIsOpened) {
         chan.send(JSON.stringify(obj));
